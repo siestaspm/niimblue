@@ -4,14 +4,12 @@
   import { onDestroy, onMount, tick } from "svelte";
   import { Barcode } from "../fabric-object/barcode";
   import { QRCode } from "../fabric-object/qrcode";
-  import { iconCodepoints, type MaterialIcon } from "../mdi_icons";
   import { automation, connectionState } from "../stores";
   import {
     type ExportedLabelTemplate,
     type FabricJson,
     type LabelProps,
     type MoveDirection,
-    type OjectType,
   } from "../types";
   import { FileUtils } from "../utils/file_utils";
   import { tr } from "../utils/i18n";
@@ -20,19 +18,16 @@
   import { Toasts } from "../utils/toasts";
   import { UndoRedo, type UndoState } from "../utils/undo_redo";
   import BarcodeParamsPanel from "./BarcodeParamsControls.svelte";
-  import CsvControl from "./CsvControl.svelte";
   import GenericObjectParamsControls from "./GenericObjectParamsControls.svelte";
-  import IconPicker from "./IconPicker.svelte";
   import LabelPropsEditor from "./LabelPropsEditor.svelte";
   import MdIcon from "./basic/MdIcon.svelte";
-  import ObjectPicker from "./ObjectPicker.svelte";
   import PrintPreview from "./PrintPreview.svelte";
   import QrCodeParamsPanel from "./QRCodeParamsControls.svelte";
   import TextParamsPanel from "./TextParamsControls.svelte";
+  import QrCodeScan from "./QrCodeScan.svelte";
   import VariableInsertControl from "./VariableInsertControl.svelte";
   import { DEFAULT_LABEL_PROPS, GRID_SIZE } from "../defaults";
   import { ImageEditorUtils } from "../utils/image_editor_utils";
-  import SavedLabelsMenu from "./SavedLabelsMenu.svelte";
   import { CustomCanvas } from "../fabric-object/custom_canvas";
 
   let htmlCanvas: HTMLCanvasElement;
@@ -55,6 +50,16 @@
     selectedObject = undefined;
     selectedCount = 0;
   };
+
+  const handleQrScanned = (event: { detail: any; }) => {
+    const qrCodeText = event.detail;
+    ImageEditorObjectHelper.addText(fabricCanvas, qrCodeText); 
+    openPreviewAndPrint()
+  };
+
+  onMount(() => {
+    fabricCanvas = new CustomCanvas(htmlCanvas, { width: labelProps.size.width, height: labelProps.size.height });
+  });
 
   const loadLabelData = async (data: ExportedLabelTemplate) => {
     undo.paused = true;
@@ -151,34 +156,10 @@
     }
   };
 
-  const exportCurrentLabel = (): ExportedLabelTemplate => {
-    return FileUtils.makeExportedLabel(fabricCanvas, labelProps);
-  };
-
   const onLoadRequested = (label: ExportedLabelTemplate) => {
     loadLabelData(label).then(() => undo.push(fabricCanvas, labelProps));
   };
 
-  const zplImageReady = (img: Blob) => {
-    ImageEditorObjectHelper.addImageBlob(fabricCanvas, img).then(() => undo.push(fabricCanvas, labelProps));
-  };
-
-  const onObjectPicked = (objectType: OjectType) => {
-    const obj = ImageEditorObjectHelper.addObject(fabricCanvas, objectType);
-    if (obj !== undefined) {
-      fabricCanvas.setActiveObject(obj);
-      undo.push(fabricCanvas, labelProps);
-    }
-  };
-
-  const onIconPicked = (i: MaterialIcon) => {
-    // todo: icon is not vertically centered
-    ImageEditorObjectHelper.addStaticText(fabricCanvas, String.fromCodePoint(iconCodepoints[i]), {
-      fontFamily: "Material Icons",
-      fontSize: 100,
-    });
-    undo.push(fabricCanvas, labelProps);
-  };
 
   const onPreviewClosed = () => {
     printNow = false;
@@ -206,22 +187,6 @@
 
   const getCanvasForPreview = (): FabricJson => {
     return fabricCanvas.toJSON();
-  };
-
-  const onCsvUpdate = (enabled: boolean, csv: string) => {
-    csvData = csv;
-    csvEnabled = enabled;
-    LocalStoragePersistence.saveCsv(csvData);
-  };
-
-  const onCsvPlaceholderPicked = (name: string) => {
-    const obj = ImageEditorObjectHelper.addText(fabricCanvas, `{${name}}`, {
-      textAlign: "left",
-      originX: "left",
-      originY: "top",
-    });
-    fabricCanvas.setActiveObject(obj);
-    undo.push(fabricCanvas, labelProps);
   };
 
   const onPaste = async (event: ClipboardEvent) => {
@@ -371,42 +336,17 @@
     </div>
   </div>
 
+  <div class="row mb-2">
+    <div class="col d-flex justify-content-center">
+      <QrCodeScan on:qrScanned={handleQrScanned} />
+    </div>
+  </div>
+
   <div class="row mb-1">
     <div class="col d-flex justify-content-center">
       <div class="toolbar d-flex flex-wrap gap-1 justify-content-center align-items-center">
         <LabelPropsEditor {labelProps} onChange={onUpdateLabelProps} />
 
-        <SavedLabelsMenu canvas={fabricCanvas} onRequestLabelTemplate={exportCurrentLabel} {onLoadRequested} />
-
-        <button
-          class="btn btn-sm btn-secondary"
-          disabled={undoState.undoDisabled}
-          on:click={() => undo.undo()}
-          title={$tr("editor.undo")}>
-          <MdIcon icon="undo" />
-        </button>
-
-        <button
-          class="btn btn-sm btn-secondary"
-          disabled={undoState.redoDisabled}
-          on:click={() => undo.redo()}
-          title={$tr("editor.redo")}>
-          <MdIcon icon="redo" />
-        </button>
-
-        <CsvControl
-          csv={csvData}
-          enabled={csvEnabled}
-          onUpdate={onCsvUpdate}
-          onPlaceholderPicked={onCsvPlaceholderPicked} />
-
-        <IconPicker onSubmit={onIconPicked} />
-        <ObjectPicker onSubmit={onObjectPicked} {labelProps} {zplImageReady} />
-
-        <button class="btn btn-sm btn-primary ms-1" on:click={openPreview}>
-          <MdIcon icon="visibility" />
-          {$tr("editor.preview")}
-        </button>
         <button
           title="Print with default or saved parameters"
           class="btn btn-sm btn-primary ms-1"
