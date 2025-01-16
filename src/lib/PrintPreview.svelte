@@ -84,71 +84,63 @@
     FileUtils.printImageUrls(sources);
   };
 
-  const clearCanvas = () => {
-  if (previewContext) {
-    previewContext.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-  }
-};
+  const onPrint = async () => {
+    printState = "sending";
+    error = "";
+    $printerClient.stopHeartbeat();
 
-const onPrint = async () => {
-  printState = "sending";
-  error = "";
-  $printerClient.stopHeartbeat();
+    // do it in a stupid way (multi-page print not finished yet)
+    for (let curPage = 0; curPage < pagesTotal; curPage++) {
+      const printTask = $printerClient.abstraction.newPrintTask(printTaskName, {
+        totalPages: quantity,
+        density,
+        labelType,
+        statusPollIntervalMs: 100,
+        statusTimeoutMs: 8_000,
+      });
 
-  // do it in a stupid way (multi-page print not finished yet)
-  for (let curPage = 0; curPage < pagesTotal; curPage++) {
-    const printTask = $printerClient.abstraction.newPrintTask(printTaskName, {
-      totalPages: quantity,
-      density,
-      labelType,
-      statusPollIntervalMs: 100,
-      statusTimeoutMs: 8_000,
-    });
+      page = curPage;
+      console.log("Printing page", page);
 
-    page = curPage;
-    console.log("Printing page", page);
+      await generatePreviewData(page);
+      const encoded: EncodedImage = ImageEncoder.encodeCanvas(previewCanvas, labelProps.printDirection);
 
-    await generatePreviewData(page);
-    const encoded: EncodedImage = ImageEncoder.encodeCanvas(previewCanvas, labelProps.printDirection);
+      try {
+        await printTask.printInit();
+        await printTask.printPage(encoded, quantity);
+      } catch (e) {
+        error = `${e}`;
+        console.error(e);
+        return;
+      }
 
-    try {
-      await printTask.printInit();
-      await printTask.printPage(encoded, quantity);
-    } catch (e) {
-      error = `${e}`;
-      console.error(e);
-      return;
+      printState = "printing";
+
+      const listener = (e: PrintProgressEvent) => {
+        printProgress = Math.floor((e.page / quantity) * ((e.pagePrintProgress + e.pageFeedProgress) / 2));
+      };
+
+      $printerClient.on("printprogress", listener);
+
+      try {
+        await printTask.waitForFinished();
+      } catch (e) {
+        error = `${e}`;
+        console.error(e);
+      }
+
+      $printerClient.off("printprogress", listener);
+
+      await endPrint();
     }
 
-    printState = "printing";
+    printState = "idle";
+    $printerClient.startHeartbeat();
 
-    const listener = (e: PrintProgressEvent) => {
-      printProgress = Math.floor((e.page / quantity) * ((e.pagePrintProgress + e.pageFeedProgress) / 2));
-    };
-
-    $printerClient.on("printprogress", listener);
-
-    try {
-      await printTask.waitForFinished();
-    } catch (e) {
-      error = `${e}`;
-      console.error(e);
+    if (printNow && !error) {
+      modal.hide();
     }
-
-    $printerClient.off("printprogress", listener);
-
-    await endPrint();
-  }
-
-  printState = "idle";
-  $printerClient.startHeartbeat();
-
-  if (printNow && !error) {
-    modal.hide();
-    clearCanvas();  // Clear the canvas after print completes
-  }
-};
-
+  };
 
   const updatePreview = () => {
     let iData: ImageData = copyImageData(originalImage);
