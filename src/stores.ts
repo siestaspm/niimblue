@@ -1,5 +1,5 @@
 import { get, readable, writable } from "svelte/store";
-import type { AutomationProps, ConnectionState, ConnectionType } from "./types";
+import { AppConfigSchema, CsvParams, CsvParamsSchema, type AppConfig, type AutomationProps, type ConnectionState, type ConnectionType } from "$/types";
 import {
   NiimbotBluetoothClient,
   NiimbotCapacitorBleClient,
@@ -14,12 +14,13 @@ import {
   type PrinterModelMeta,
   type RfidInfo,
 } from "@mmote/niimbluelib";
-import { Toasts } from "./utils/toasts";
-import { tr } from "./utils/i18n";
-import { LocalStoragePersistence } from "./utils/persistence";
-import { OBJECT_DEFAULTS_TEXT } from "./defaults";
+import { Toasts } from "$/utils/toasts";
+import { tr } from "$/utils/i18n";
+import { LocalStoragePersistence, writablePersisted } from "$/utils/persistence";
+import { APP_CONFIG_DEFAULTS, CSV_DEFAULT, OBJECT_DEFAULTS_TEXT } from "$/defaults";
 
 export const fontCache = writable<string[]>([OBJECT_DEFAULTS_TEXT.fontFamily]);
+export const appConfig = writablePersisted<AppConfig>("config", AppConfigSchema, APP_CONFIG_DEFAULTS);
 
 export const connectionState = writable<ConnectionState>("disconnected");
 export const connectedPrinterName = writable<string>("");
@@ -27,8 +28,11 @@ export const printerClient = writable<NiimbotAbstractClient>();
 export const heartbeatData = writable<HeartbeatData>();
 export const printerInfo = writable<PrinterInfo>();
 export const rfidInfo = writable<RfidInfo | undefined>();
+export const ribbonRfidInfo = writable<RfidInfo | undefined>();
 export const printerMeta = writable<PrinterModelMeta | undefined>();
 export const heartbeatFails = writable<number>(0);
+export const csvData = writablePersisted<CsvParams>("csv_params", CsvParamsSchema, { data: CSV_DEFAULT });
+
 export const automation = readable<AutomationProps | undefined>(
   (() => {
     try {
@@ -37,10 +41,26 @@ export const automation = readable<AutomationProps | undefined>(
       console.error(e);
     }
     return undefined;
-  })()
+  })(),
 );
 
+export const refreshRfidInfo = () => {
+  const client = get(printerClient);
+
+  if (!client) {
+    return;
+  }
+
+  client.abstraction.rfidInfo().then(rfidInfo.set).catch(console.error);
+
+  client.abstraction
+    .rfidInfo2()
+    .then(ribbonRfidInfo.set)
+    .catch(() => {});
+};
+
 export const initClient = (connectionType: ConnectionType) => {
+  refreshRfidInfo();
   printerClient.update((prevClient: NiimbotAbstractClient) => {
     let newClient: NiimbotAbstractClient = prevClient;
 
@@ -89,7 +109,7 @@ export const initClient = (connectionType: ConnectionType) => {
         heartbeatFails.set(0);
         heartbeatData.update((prev) => {
           if (prev?.rfidReadState !== e.data?.rfidReadState) {
-            newClient.abstraction.rfidInfo().then(rfidInfo.set).catch(console.error);
+            refreshRfidInfo();
           }
           return e.data;
         });

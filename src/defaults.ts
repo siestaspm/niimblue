@@ -1,10 +1,14 @@
 import * as fabric from "fabric";
-import type { LabelPreset, LabelProps } from "./types";
+import type { AppConfig, LabelPreset, LabelProps } from "$/types";
 
 /** Default presets for LabelPropsEditor */
 export const DEFAULT_LABEL_PRESETS: LabelPreset[] = [
-  { width: 30, height: 12, unit: "mm", dpmm: 8, printDirection: "left", shape: "rect" },
+  // 203dpi
+  { width: 40, height: 12, unit: "mm", dpmm: 8, printDirection: "left", shape: "rect" },
   { width: 50, height: 30, unit: "mm", dpmm: 8, printDirection: "top", shape: "rect" },
+  // 300dpi
+  { width: 40, height: 12, unit: "mm", dpmm: 11.81, printDirection: "left", shape: "rect", title: "40x12mm 300dpi" },
+  { width: 50, height: 30, unit: "mm", dpmm: 11.81, printDirection: "top", shape: "rect", title: "50x30mm 300dpi" },
 ];
 
 /** Default canvas dimensions */
@@ -57,3 +61,10 @@ export const THUMBNAIL_HEIGHT = 48;
 
 /** Generate thumbnail in jpeg format with this quality */
 export const THUMBNAIL_QUALITY = 0.7;
+
+export const APP_CONFIG_DEFAULTS: AppConfig = {
+  fitMode: "stretch",
+  pageDelay: 0,
+};
+
+export const CSV_DEFAULT = "var1,var2\n123,456\n777,888";

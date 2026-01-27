@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { resolve } from "node:path";
 
 const getDate = (): string => {
   const date = new Date();
@@ -15,11 +16,40 @@ export default defineConfig({
     __APP_COMMIT__: JSON.stringify(process.env.COMMIT_HASH),
     __BUILD_DATE__: JSON.stringify(getDate()),
   },
+  optimizeDeps: {
+    include: ["@mmote/niimbluelib"], // Fix browser error when using `npm link @mmote/niimbluelib`
+  },
+  resolve: {
+    preserveSymlinks: true, // Fix build error when using `npm link @mmote/niimbluelib`
+    alias: {
+      $: resolve(__dirname, "./src")
+    },
+  },
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          fabric: ["fabric"],
+        manualChunks: (id: string) => {
+          if (id.endsWith(".css") || id.endsWith(".scss")) {
+            return "style";
+          }
+
+          if (id.includes("node_modules")) {
+            if (id.includes("fabric")) {
+              return "lib.2.fabric";
+            } else if (
+              id.includes("@capacitor/filesystem") ||
+              id.includes("@capacitor/share")
+            ) {
+              return "lib.2.cap";
+            } else if (id.includes("zod")) {
+              return "lib.2.zod";
+            } else if (id.includes("@mmote/niimbluelib")) {
+              return "lib.2.niim";
+            }
+
+            return "lib.1.other";
+          }
+          return null;
         },
         chunkFileNames: () => {
           return "assets/[name].[hash].js";

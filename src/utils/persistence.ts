@@ -11,9 +11,45 @@ import {
   type LabelPreset,
   type LabelProps,
   type PreviewProps,
-} from "../types";
+} from "$/types";
 import { z } from "zod";
-import { FileUtils } from "./file_utils";
+import { FileUtils } from "$/utils/file_utils";
+import { get, writable, type Updater, type Writable } from "svelte/store";
+
+/** Writable store, value is persisted to localStorage */
+export function writablePersisted<T>(
+  key: string,
+  schema: z.ZodType<T>,
+  initialValue: T,
+): Writable<T> {
+  const wr = writable<T>(initialValue);
+
+  try {
+    const val = LocalStoragePersistence.loadAndValidateObject(key, schema);
+    if (val === null) {
+      wr.set(initialValue);
+    } else {
+      wr.set(val);
+    }
+  } catch {
+    wr.set(initialValue);
+  }
+
+  return {
+    subscribe: wr.subscribe,
+
+    set: (value: T) => {
+      LocalStoragePersistence.validateAndSaveObject(key, value, schema);
+      wr.set(value);
+    },
+
+    update: (updater: Updater<T>) => {
+      const newValue: T = updater(get(wr));
+      LocalStoragePersistence.validateAndSaveObject(key, newValue, schema);
+      wr.set(newValue);
+    },
+  };
+}
 
 export class LocalStoragePersistence {
   /** Result in kilobytes */
@@ -26,7 +62,7 @@ export class LocalStoragePersistence {
   }
 
   static saveObject(key: string, data: any) {
-    if (data == null || data == undefined) {
+    if (data === null || data === undefined) {
       localStorage.removeItem(key);
       return;
     }
@@ -57,7 +93,11 @@ export class LocalStoragePersistence {
     return schema.parse(data);
   }
 
-  static validateAndSaveObject<T>(key: string, data: any, schema: z.ZodType<T>): void {
+  static validateAndSaveObject<T>(
+    key: string,
+    data: any,
+    schema: z.ZodType<T>,
+  ): void {
     if (data === null || data === undefined) {
       this.saveObject(key, data);
       return;
@@ -67,23 +107,22 @@ export class LocalStoragePersistence {
     this.saveObject(key, obj);
   }
 
-  static saveCsv(data: string) {
-    this.saveObject("csv_params", { data });
-  }
+  // static saveCsv(data: string) {
+  //   this.saveObject("csv_params", { data });
+  // }
+  // static loadCsv(): { data: string } {
+  //   const result = this.loadObject("csv_params");
 
-  static loadCsv(): { data: string } {
-    const result = this.loadObject("csv_params");
+  //   if (result === null) {
+  //     return {
+  //       data: "var1,var2\n123,456\n777,888",
+  //     };
+  //   }
 
-    if (result === null) {
-      return {
-        data: "var1,var2\n123,456\n777,888",
-      };
-    }
-
-    return {
-      data: result.data,
-    };
-  }
+  //   return {
+  //     data: result.data,
+  //   };
+  // }
 
   /**
    * @throws {z.ZodError}
@@ -99,7 +138,21 @@ export class LocalStoragePersistence {
     this.validateAndSaveObject("last_label_props", labelData, LabelPropsSchema);
   }
 
-  static saveLabels(labels: ExportedLabelTemplate[]): { zodErrors: z.ZodError[]; otherErrors: Error[] } {
+  static createUidForLabel(label: ExportedLabelTemplate): string {
+    const basename = `saved_label_${label.timestamp}`;
+    let counter = 0;
+
+    while (`${basename}_${counter}` in localStorage) {
+      counter++;
+    }
+
+    return `${basename}_${counter}`;
+  }
+
+  static saveLabels(labels: ExportedLabelTemplate[]): {
+    zodErrors: z.ZodError[];
+    otherErrors: Error[];
+  } {
     const zodErrors: z.ZodError[] = [];
     const otherErrors: Error[] = [];
 
@@ -111,7 +164,7 @@ export class LocalStoragePersistence {
 
     labels.forEach((label) => {
       try {
-        if (label.timestamp == undefined) {
+        if (label.timestamp === undefined) {
           label.timestamp = FileUtils.timestamp();
         }
 
@@ -122,7 +175,11 @@ export class LocalStoragePersistence {
           counter++;
         }
 
-        this.validateAndSaveObject(`${basename}_${counter}`, label, ExportedLabelTemplateSchema);
+        this.validateAndSaveObject(
+          this.createUidForLabel(label),
+          label,
+          ExportedLabelTemplateSchema.omit({ id: true }),
+        );
       } catch (e) {
         if (e instanceof z.ZodError) {
           zodErrors.push(e);
@@ -139,8 +196,14 @@ export class LocalStoragePersistence {
    * @throws {z.ZodError}
    */
   static loadLabels(): ExportedLabelTemplate[] {
-    const legacyLabel = this.loadAndValidateObject("saved_canvas_props", LabelPropsSchema);
-    const legacyCanvas = this.loadAndValidateObject("saved_canvas_data", FabricJsonSchema);
+    const legacyLabel = this.loadAndValidateObject(
+      "saved_canvas_props",
+      LabelPropsSchema,
+    );
+    const legacyCanvas = this.loadAndValidateObject(
+      "saved_canvas_data",
+      FabricJsonSchema,
+    );
     const items: ExportedLabelTemplate[] = [];
 
     if (legacyLabel !== null && legacyCanvas !== null) {
@@ -151,7 +214,11 @@ export class LocalStoragePersistence {
         canvas: legacyCanvas,
         timestamp: FileUtils.timestamp(),
       };
-      this.validateAndSaveObject(`saved_label_${item.timestamp}`, item, ExportedLabelTemplateSchema);
+      this.validateAndSaveObject(
+        `saved_label_${item.timestamp}`,
+        item,
+        ExportedLabelTemplateSchema,
+      );
     }
 
     Object.keys(localStorage)
@@ -159,8 +226,12 @@ export class LocalStoragePersistence {
       .forEach((key) => {
         if (key.startsWith("saved_label")) {
           try {
-            const item = this.loadAndValidateObject(key, ExportedLabelTemplateSchema);
+            const item = this.loadAndValidateObject(
+              key,
+              ExportedLabelTemplateSchema,
+            );
             if (item != null) {
+              item.id = key;
               items.push(item);
             }
           } catch (e) {
@@ -176,28 +247,42 @@ export class LocalStoragePersistence {
    * @throws {z.ZodError}
    */
   static savePreviewProps(props: PreviewProps) {
-    this.validateAndSaveObject("saved_preview_props", props, PreviewPropsSchema);
+    this.validateAndSaveObject(
+      "saved_preview_props",
+      props,
+      PreviewPropsSchema,
+    );
   }
 
   /**
    * @throws {z.ZodError}
    */
   static loadSavedPreviewProps(): PreviewProps | null {
-    return this.loadAndValidateObject("saved_preview_props", PreviewPropsSchema);
+    return this.loadAndValidateObject(
+      "saved_preview_props",
+      PreviewPropsSchema,
+    );
   }
 
   /**
    * @throws {z.ZodError}
    */
   static saveLabelPresets(presets: LabelPreset[]) {
-    this.validateAndSaveObject("label_presets", presets, z.array(LabelPresetSchema));
+    this.validateAndSaveObject(
+      "label_presets",
+      presets,
+      z.array(LabelPresetSchema),
+    );
   }
 
   /**
    * @throws {z.ZodError}
    */
   static loadLabelPresets(): LabelPreset[] | null {
-    const presets = this.loadAndValidateObject("label_presets", z.array(LabelPresetSchema));
+    const presets = this.loadAndValidateObject(
+      "label_presets",
+      z.array(LabelPresetSchema),
+    );
     return presets === null || presets.length === 0 ? null : presets;
   }
 
@@ -231,14 +316,21 @@ export class LocalStoragePersistence {
    * @throws {z.ZodError}
    */
   static saveDefaultTemplate(value?: ExportedLabelTemplate) {
-    this.validateAndSaveObject("default_template", value, ExportedLabelTemplateSchema);
+    this.validateAndSaveObject(
+      "default_template",
+      value,
+      ExportedLabelTemplateSchema.omit({ id: true }),
+    );
   }
 
   /**
    * @throws {z.ZodError}
    */
   static loadDefaultTemplate(): ExportedLabelTemplate | null {
-    return this.loadAndValidateObject("default_template", ExportedLabelTemplateSchema);
+    return this.loadAndValidateObject(
+      "default_template",
+      ExportedLabelTemplateSchema,
+    );
   }
 
   static hasCustomDefaultTemplate(): boolean {

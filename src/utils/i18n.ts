@@ -1,36 +1,26 @@
 import { derived, writable } from "svelte/store";
-import type { TranslationKey, SupportedLanguage } from "../locale";
-import { languageNames, langPack } from "../locale";
+import type { TranslationKey, SupportedLanguage } from "$/locale";
+import { languageNames, langPack } from "$/locale";
+import { match as langMatch } from "@formatjs/intl-localematcher";
 
 /** Check browser language and return supported language code.
  *  If language is not supported, "en" is returned. */
 const guessBrowserLanguage = (): SupportedLanguage => {
-  switch (navigator.language) {
-    case "de":
-    case "de-AT":
-    case "de-CH":
-    case "de-DE":
-    case "de-LI":
-    case "de-LU":
-      return "de";
-    case "it":
-    case "it-CH":
-    case "it-IT":
-      return "it";
-    case "ru":
-    case "ru-RU":
-      return "ru";
-    case "zh":
-    case "zh-Hans":
-    case "zh-CN":
-      return "zh_cn";
-    default:
-      return "en";
+  const fallback: SupportedLanguage = "en";
+  const browserLang = navigator.language;
+  const supportedLangs = Object.keys(langPack).map((e) => e.replaceAll("_", "-"));
+
+  try {
+    const nearestLang = langMatch([browserLang], supportedLangs, fallback);
+    return nearestLang.replaceAll("-", "_") as SupportedLanguage;
+  } catch (e) {
+    console.warn("Unable to detect language:", e);
+    return fallback;
   }
 };
 
 export const locale = writable<SupportedLanguage>(
-  (localStorage.getItem("locale") as SupportedLanguage) ?? guessBrowserLanguage()
+  (localStorage.getItem("locale") as SupportedLanguage) ?? guessBrowserLanguage(),
 );
 
 locale.subscribe((value: SupportedLanguage) => localStorage.setItem("locale", value));
@@ -47,4 +37,4 @@ export const tr = derived(locale, ($locale) => (key: TranslationKey) => {
 });
 
 export const locales = languageNames;
-export type { TranslationKey, SupportedLanguage } from "../locale";
+export type { TranslationKey, SupportedLanguage } from "$/locale";

@@ -1,0 +1,68 @@
+name: Deploy to server
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches:
+      - main
+      - dev
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    if: gitea.repository == 'MultiMote/niimblue'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+
+      - name: Setup rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code
+        run: npm run sv-check
+
+      - name: Build
+        run: npx vite build --base="/"
+        env:
+          COMMIT_HASH: ${{gitea.sha}}
+
+      - name: Generate Sitemap
+        run: |
+          echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+          <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
+            <url>
+              <loc>$DEPLOY_URL</loc>
+              <lastmod>$LAST_MODIFIED</lastmod>
+            </url>
+          </urlset>" > ./dist/sitemap.xml
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          LAST_MODIFIED: ${{ gitea.event.repository.updated_at }}
+
+      - name: Deploy with Rsync
+        run: |
+          rsync -avz --delete \
+                -e "ssh -p ${{ secrets.SSH_PORT || 22 }}" \
+                ./dist/ ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/${{ gitea.head_ref || gitea.ref_name }}/

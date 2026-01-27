@@ -1,61 +1,98 @@
-# NiimBlue
+<div align="center">
 
-Niimbot printers webui. Design and print labels right from your browser.
+[![logo](about/logo.svg)](https://niim.blue)
 
-Uses [NiimBlueLib](https://github.com/MultiMote/niimbluelib) for communication.
+# NIIMBOT printers webui
 
-Project is deployed [here](https://niim.mmote.ru).
+Design and print labels right from your browser
 
-> [!NOTE]
-> If you have printing problems, try different print task versions in print preview dialog. Make if default by pressing "Lock" button.
->
-> If you found version suitable for your model, please write [here](https://github.com/MultiMote/niimbluelib/issues/1).
+[FAQ](https://github.com/MultiMote/niimblue/wiki/Frequently-asked-questions) | [Discord](https://discord.gg/jXPAfZVd8a) | [Telegram](https://t.me/niimblue) | [Boosty](https://boosty.to/multimote) | [NIIMBOT Community Wiki](https://printers.niim.blue)
+
+[NiimBlueLib](https://github.com/MultiMote/niimbluelib) is used for communication
+
+</div>
 
 ## Features
 
-You can see the list of implemented and planned features [on the Wiki](https://github.com/MultiMote/niimblue/wiki#features).
+* Privacy first! This application works completely offline (at browser side) and does not send any data (except for downloading application files and importing ZPL labels). Label data is stored in your browser.
+* Support for both Bluetooth and USB connections.
+* Rich label editor. Label saving, import/export.
+* Print preview. You can see how your label will look like after post-processing. Several post-processing algorithms are available.
+* Android App (Capacitor based).
+* Most complete implementation of [NIIMBOT protocol](https://printers.niim.blue/interfacing/proto/).
 
-List of supported models you can find in [niimluelib](https://github.com/MultiMote/niimbluelib/issues/1) repository.
+You can see more complete list of implemented and planned features [on the Wiki](https://github.com/MultiMote/niimblue/wiki#features).
 
 Demonstration video:
 
 [![demo video](https://img.youtube.com/vi/u8QX-5e3W_A/mqdefault.jpg)](https://www.youtube.com/watch?v=u8QX-5e3W_A)
 
-## Browser support
+## Supported printers
+
+There is no exact list of supported models in this project. This project aims to support the maximum number of models.
+
+You can check [a list of tested models here](https://github.com/MultiMote/niimbluelib/issues/1). If you own other model, please write a comment.
+
+If your (new) printer model does not print, please make a [packet dump](https://github.com/MultiMote/niimblue/wiki/Making-packet-capture) of print with official application.
+
+> [!NOTE]
+> If you have printing problems, try different print task versions in print preview dialog. Make if default by pressing "Lock" button.
+
+
+## Supported browsers
 
 Your browser must support Web Bluetooth API: [supported browsers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API#browser_compatibility).
 
 For serial communication: [supported browsers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API#browser_compatibility).
 
-In some systems you need to enable Chrome `Experimental Web Platform Features` (navigate to `chrome://flags`).
+Modern Chrome-based browsers should usually work.
 
-## Feedback needed!
-
-I only have D110 and B1 printers. If you own other models, please write a comment [here](https://github.com/MultiMote/niimbluelib/issues/1) describing your model working or not.
-
-Bluetooth dumps are MUCH appreciated (search how to enable **Bluetooth HCI Snoop Log** for your device, print any label with **Niimbot** app then run `adb bugreport filename`, you should find **btsnoop_hci.log** in the archive).
+In some systems you need to enable Chrome `Web Bluetooth` or `Experimental Web Platform Features` (navigate to `chrome://flags`).
 
 ## Images
 
-Images may be outdated, interface is changing constantly.
+Images may be outdated.
 
 ![ui](about/ui.png)
 
+<details>
+<summary>⬇ More images ⬇</summary>
+
+Label properties:
+
 ![labels](about/labels.png)
+
+Save/load menu:
+
+![save_load](about/save_load.png)
+
+Print preview dialog:
 
 ![print_preview](about/print_preview.png)
 
+Post-processing:
+
 ![dither](about/dither.png)
+
+Templating:
 
 ![templating](about/templating.png)
 
+Dynamic data:
+
 ![batch](about/batch.png)
+
+In real life:
 
 ![printed_b1](about/printed_b1.jpg)
 
 ![printed_d110](about/printed_d110.jpg)
+</details>
 
-## Launching development server
+
+## Development
+
+### Launching development server
 
 Skip steps you have done.
 
@@ -63,46 +100,50 @@ Skip steps you have done.
 
 2. Install [nodejs](https://nodejs.org)
 
-3. Install [yarn](https://yarnpkg.com)
-
-4. Clone repository
+3. Clone repository
 
     ```bash
     git clone https://github.com/MultiMote/niimblue.git
     ```
 
-5. Install dependencies
+4. Install dependencies
 
     ```bash
-    yarn install
+    npm i
     ```
 
-6. Run dev server
+5. Run dev server
 
-    Check code and open browser:
+    Check code and run:
 
     ```bash
-    yarn dev-check
+    npm run dev-check
     ```
 
     Or just run:
 
     ```bash
-    yarn dev
+    npm run dev
     ```
 
-Eslint not included. Install it with:
+### Deployment
 
-```bash
-npm install --no-save --no-package-lock eslint@9.x globals @types/eslint @eslint/js typescript-eslint eslint-plugin-svelte
+To run own instance, build static files (`npm run build`) and host on yor web server (HTTPS required),
+or use [Docker Image](https://github.com/MultiMote/niimblue/wiki/Running-own-instance-with-Docker).
+
+### IDE setup
+
+Project uses path aliases.
+
+VSCode (settings.json):
+
+```json
+{
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "javascript.preferences.importModuleSpecifier": "non-relative"
+}
 ```
 
-## Translation status
+## Translations (click to contribute)
 
 [![translation](https://weblate.mmote.ru/widget/niimblue/web/multi-auto.svg)](https://weblate.mmote.ru/engage/niimblue/)
-
-## Other
-
-|  Links |    |
-|--------| -- |
-| [<img src="https://raw.githubusercontent.com/tandpfun/skill-icons/65dea6c4eaca7da319e552c09f4cf5a9a8dab2c8/icons/Discord.svg" width="48">](https://discord.gg/jXPAfZVd8a) | Discord (dev news, troubleshooting and other) |
