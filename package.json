@@ -23,6 +23,7 @@
 		"@formatjs/intl-localematcher": "^0.6.2",
 		"@mmote/niimbluelib": "0.0.1-alpha.32",
 		"@popperjs/core": "^2.11.8",
+		"axios": "^1.13.3",
 		"bootstrap": "5.3.8",
 		"d3-dsv": "^3.0.1",
 		"dayjs": "^1.11.19",

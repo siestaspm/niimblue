@@ -1,0 +1,211 @@
+<!-- In PrintPreview.svelte, modify the generatePreviewData function: -->
+<script lang="ts">
+  // ... existing imports ...
+
+  // Add these state variables
+  let currentItemIndex = $state<number>(0);
+  let itemsToPrint = $state<{ listing_id: string; model: string }[]>([]);
+
+  const generatePreviewData = async (page: number): Promise<void> => {
+    const fabricTempCanvas = new CustomCanvas(undefined, {
+      width: labelProps.size.width,
+      height: labelProps.size.height,
+    });
+
+    fabricTempCanvas.setCustomBackground(false);
+    fabricTempCanvas.setHighlightMirror(false);
+    fabricTempCanvas.setLabelProps(labelProps);
+
+    // Load the base canvas
+    await fabricTempCanvas.loadFromJSON(canvasCallback());
+    
+    // Clear existing objects
+    fabricTempCanvas.clear();
+    
+    // Get variables for this specific item
+    let variables = {};
+    if (csvEnabled) {
+      if (page >= 0 && page < csvParsed.length) {
+        variables = csvParsed[page];
+      }
+    } else if (itemsToPrint.length > 0) {
+      // Use sessionStorage items when no CSV
+      const item = itemsToPrint[page];
+      if (item) {
+        // Create dynamic content based on the item
+        const yPosition = 25; // Adjust as needed
+        
+        // Add QR Code
+        const qr = new QRCode({
+          text: `https://links.xuredeal.com/open-app/xchange_item/${item.listing_id}`,
+          width: 190,
+          height: 190,
+          left: 20,
+          top: yPosition
+        });
+        fabricTempCanvas.add(qr);
+
+        // Add text
+        const textHello = new fabric.Text("XTORE", {
+          left: 220,
+          top: yPosition + 20,
+          fontSize: 20,
+          fontFamily: "Arial",
+          fill: "#000"
+        });
+        fabricTempCanvas.add(textHello);
+
+        const textName = new fabric.Text(item.model, {
+          left: 220,
+          top: yPosition + 50,
+          fontSize: 18,
+          fontFamily: "Arial",
+          fill: "#000"
+        });
+        fabricTempCanvas.add(textName);
+      }
+    }
+
+    // If using CSV with template variables, preprocess as before
+    if (csvEnabled) {
+      canvasPreprocess(fabricTempCanvas, variables);
+    }
+
+    await fabricTempCanvas.createMirroredObjects();
+    fabricTempCanvas.requestRenderAll();
+
+    const preRenderedCanvas = fabricTempCanvas.toCanvasElement();
+    const ctx = preRenderedCanvas.getContext("2d")!;
+    previewCanvas.width = preRenderedCanvas.width;
+    previewCanvas.height = preRenderedCanvas.height;
+    previewContext = previewCanvas.getContext("2d")!;
+    originalImage = ctx.getImageData(0, 0, preRenderedCanvas.width, preRenderedCanvas.height);
+
+    updatePreview();
+    fabricTempCanvas.dispose();
+  };
+
+  onMount(async () => {
+    // Load items from sessionStorage
+    try {
+      const storedItems = sessionStorage.getItem('selectedItems');
+      if (storedItems) {
+        itemsToPrint = JSON.parse(storedItems);
+        if (!csvEnabled && itemsToPrint.length > 0) {
+          pagesTotal = itemsToPrint.length;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load items from sessionStorage:', e);
+    }
+
+    if (csvEnabled) {
+      csvParsed = csvParse(csvData);
+      pagesTotal = csvParsed.length;
+    }
+
+    modal = new Modal(modalElement);
+    modal.show();
+    // ... rest of existing onMount code ...
+  });
+
+  const onPrint = async () => {
+    printState = "sending";
+    error = "";
+
+    // Loop through all pages/items
+    for (let curPage = 0; curPage < pagesTotal; curPage++) {
+      $printerClient.stopHeartbeat();
+
+      currentPrintTask = $printerClient.abstraction.newPrintTask(printTaskName, {
+        totalPages: quantity,
+        density,
+        labelType,
+        statusPollIntervalMs: 100,
+        statusTimeoutMs: 8_000,
+      });
+
+      page = curPage;
+      currentItemIndex = curPage; // Track which item we're printing
+      
+      console.log(`Printing page ${curPage + 1} of ${pagesTotal}`);
+      
+      // Generate preview for this specific item/page
+      await generatePreviewData(page);
+
+      try {
+        const encoded: EncodedImage = ImageEncoder.encodeCanvas(previewCanvas, labelProps.printDirection);
+        await currentPrintTask.printInit();
+        // Print multiple copies if quantity > 1
+        await currentPrintTask.printPage(encoded, quantity);
+      } catch (e) {
+        error = `${e}`;
+        console.error(e);
+        return;
+      }
+
+      printState = "printing";
+
+      const listener = (e: PrintProgressEvent) => {
+        // Calculate progress across all pages
+        const pageProgress = Math.floor((e.page / quantity) * ((e.pagePrintProgress + e.pageFeedProgress) / 2));
+        const overallProgress = Math.floor(((curPage * quantity + e.page) / (pagesTotal * quantity)) * 100);
+        printProgress = overallProgress;
+      };
+
+      $printerClient.on("printprogress", listener);
+
+      try {
+        await currentPrintTask.waitForFinished();
+      } catch (e) {
+        error = `${e}`;
+        console.error(e);
+      }
+
+      $printerClient.off("printprogress", listener);
+
+      await endPrint();
+
+      // Add delay between pages if configured
+      if ($appConfig.pageDelay > 0 && pagesTotal > 1 && curPage < pagesTotal - 1) {
+        await Utils.sleep($appConfig.pageDelay);
+      }
+    }
+
+    printState = "idle";
+    $printerClient.startHeartbeat();
+
+    if (printNow && !error) {
+      modal.hide();
+    }
+  };
+</script>
+
+<!-- Update the modal body to show current item info -->
+<div class="modal-body text-center">
+  <div class="d-flex justify-content-center">
+    {#if pagesTotal > 1}
+      <button disabled={printState !== "idle"} class="btn w-100 fs-1" onclick={pageDown}>
+        <MdIcon icon="chevron_left" />
+      </button>
+    {/if}
+
+    <canvas class="print-start-{labelProps.printDirection}" bind:this={previewCanvas}></canvas>
+
+    {#if pagesTotal > 1}
+      <button disabled={printState !== "idle"} class="btn w-100 fs-1" onclick={pageUp}>
+        <MdIcon icon="chevron_right" />
+      </button>
+    {/if}
+  </div>
+  
+  <!-- Show current item info -->
+  {#if itemsToPrint.length > 0 && !csvEnabled}
+    <div class="mt-2">
+      <small>Item {page + 1} of {pagesTotal}</small><br>
+      <strong>{itemsToPrint[page]?.model}</strong>
+    </div>
+  {:else if pagesTotal > 1}
+    <div>Page {page + 1} / {pagesTotal}</div>
+  {/if}
+</div>

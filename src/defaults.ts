@@ -13,10 +13,10 @@ export const DEFAULT_LABEL_PRESETS: LabelPreset[] = [
 
 /** Default canvas dimensions */
 export const DEFAULT_LABEL_PROPS: LabelProps = {
-  printDirection: "left",
+  printDirection: "top",
   size: {
-    width: 240,
-    height: 96,
+    width: 400,
+    height: 250,
   },
 };
 

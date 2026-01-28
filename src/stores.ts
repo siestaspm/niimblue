@@ -77,7 +77,7 @@ export const initClient = (connectionType: ConnectionType) => {
       newClient = instantiateClient(connectionType);
 
       newClient.on("packetsent", (e) => {
-        console.log(`>> ${Utils.bufToHex(e.packet.toBytes())} (${RequestCommandId[e.packet.command]})`);
+        // console.log(`>> ${Utils.bufToHex(e.packet.toBytes())} (${RequestCommandId[e.packet.command]})`);
       });
 
       newClient.on("packetreceived", (e) => {
