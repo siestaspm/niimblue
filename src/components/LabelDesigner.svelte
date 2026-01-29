@@ -47,6 +47,8 @@
   let csvEnabled = $state(false);
   let windowWidth = $state(0);
   let undoState = $state<UndoState>({ undoDisabled: false, redoDisabled: false });
+  let itemsToPrint = $state<Array<{listing_id: string; model: string}>>([]);
+  let currentPrintIndex = $state(0);
 
   const undo = new UndoRedo();
 
@@ -240,12 +242,73 @@
   const onPreviewClosed = () => {
     printNow = false;
     previewOpened = false;
+
+    if (itemsToPrint.length > 0) {
+      currentPrintIndex++;
+      tick().then(() => {
+        printNextItem();
+      });
+    }
   };
 
   const openPreviewAndPrint = () => {
+    const storedItems = sessionStorage.getItem('selectedItems');
+    if (!storedItems || JSON.parse(storedItems).length === 0) return;
+
+    itemsToPrint = JSON.parse(storedItems);
+    currentPrintIndex = 0;
+    printNextItem();
+    // printNow = true;
+    // previewOpened = true;
+  };
+
+  // New function to handle sequential printing
+  const printNextItem = () => {
+    if (currentPrintIndex >= itemsToPrint.length) {
+      let printedCount = itemsToPrint.length;
+      // All done!
+      itemsToPrint = [];
+      currentPrintIndex = 0;
+      alert(`Printed ${printedCount} labels.`);
+      return;
+    }
+
+    // Generate canvas for current item only
+    fabricCanvas!.clear();
+    const item = itemsToPrint[currentPrintIndex];
+    
+    fabricCanvas!.add(new QRCode({
+      text: `https://links.xuredeal.com/open-app/xchange_item/${item.listing_id}`,
+      width: 190,
+      height: 190,
+      left: 20,
+      top: 25
+    }));
+
+    fabricCanvas!.add(new fabric.Text("XTORE", {
+      left: 220,
+      top: 45,
+      fontSize: 20,
+      fontFamily: "Arial",
+      fill: "#000"
+    }));
+
+    fabricCanvas!.add(new fabric.Text(item.model, {
+      left: 220,
+      top: 75,
+      fontSize: 18,
+      fontFamily: "Arial",
+      fill: "#000"
+    }));
+
+    fabricCanvas!.requestRenderAll();
+    
+    // Open preview for this single item
     printNow = true;
     previewOpened = true;
   };
+
+
 
   const getCanvasForPreview = (): FabricJson => fabricCanvas!.toJSON();
 
