@@ -17,12 +17,10 @@ const { onSelectChange } = $props() as { onSelectChange: () => void };
     totalItems: 0
   });
 
-function selectItem(item: any, checked: boolean) {
-  // Get current array from sessionStorage
+  function selectItem(item: any, checked: boolean) {
   const stored: any[] = JSON.parse(sessionStorage.getItem('selectedItems') || '[]');
 
   if (checked) {
-    // Add item if it's not already in the array
     if (!stored.find(i => i.listing_id === item.listing_id)) {
       stored.push({
         listing_id: item.listing_id,
@@ -30,14 +28,16 @@ function selectItem(item: any, checked: boolean) {
       });
     }
   } else {
-    // Remove item if unchecked
     const index = stored.findIndex(i => i.listing_id === item.listing_id);
     if (index > -1) stored.splice(index, 1);
   }
 
-  onSelectChange()
-
+  // ✅ SAVE FIRST
   sessionStorage.setItem('selectedItems', JSON.stringify(stored));
+
+  // ✅ THEN update canvas
+  onSelectChange();
+
   console.log("Selected items:", stored);
 }
 
@@ -65,6 +65,7 @@ function selectItem(item: any, checked: boolean) {
         inputData
       );
 
+      console.log( `${SL_API_BASE_URL}/xdeal/GetInventory`)
       state.data = (res.data.listed_items || []).map((item: any) => ({
         quantity: item.quantity,
         image_link: item.image_link,
