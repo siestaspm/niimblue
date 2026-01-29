@@ -28,7 +28,8 @@
     loading = true;
 
     const payload = {
-      version_number: "2.2.6",
+      version_number: "07.26.24",  // live
+      // version_number: "2.2.6", // dev
       Username: username,
       Password: password,
       app_name: "store"
@@ -36,7 +37,8 @@
 
     try {
       const res = await axios.post(
-        "https://pk9blqxffi.execute-api.us-east-1.amazonaws.com/xdeal/LoginXpert",
+        "https://nmx9twqzg1.execute-api.ap-southeast-1.amazonaws.com/xdeal/LoginXpert", // live
+        // "https://pk9blqxffi.execute-api.us-east-1.amazonaws.com/xdeal/LoginXpert", // dev
         payload
       );
 

@@ -239,6 +239,25 @@
     }
   };
 
+  const deselectAllItems = () => {
+    // Clear session storage
+    sessionStorage.removeItem('selectedItems');
+    
+    // Clear the canvas
+    if (fabricCanvas) {
+      fabricCanvas.clear();
+      fabricCanvas.backgroundColor = null;
+      fabricCanvas.requestRenderAll();
+    }
+    
+    // Reset any state related to selections
+    selectedObject = undefined;
+    selectedCount = 0;
+    
+    // Trigger a re-render of the table if needed
+    updateCanvasFromSelection();
+  };
+
   const onPreviewClosed = () => {
     printNow = false;
     previewOpened = false;
@@ -248,6 +267,11 @@
       tick().then(() => {
         printNextItem();
       });
+    } else {
+      // All printing is done, deselect all items
+      setTimeout(() => {
+        deselectAllItems();
+      }, 100); // Small delay to ensure everything is cleaned up
     }
   };
 
@@ -255,7 +279,12 @@
     const storedItems = sessionStorage.getItem('selectedItems');
     if (!storedItems || JSON.parse(storedItems).length === 0) return;
 
-    itemsToPrint = JSON.parse(storedItems);
+    const items = JSON.parse(storedItems);
+    if (items.length === 0) {
+      alert("No items selected to print");
+      return;
+    }
+    itemsToPrint = items;
     currentPrintIndex = 0;
     printNextItem();
     // printNow = true;
@@ -266,6 +295,10 @@
   const printNextItem = () => {
     if (currentPrintIndex >= itemsToPrint.length) {
       let printedCount = itemsToPrint.length;
+
+      // Clear session storage after printing all items
+      deselectAllItems();
+
       // All done!
       itemsToPrint = [];
       currentPrintIndex = 0;
@@ -392,7 +425,7 @@ onMount(() => {
       csvData={$csvData.data} />
   {/if}
 
-  <Table onSelectChange={updateCanvasFromSelection} />
+  <Table onSelectChange={updateCanvasFromSelection} deselectAllItems={deselectAllItems} />
 </div>
 
 <style>
