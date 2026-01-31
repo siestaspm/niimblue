@@ -388,8 +388,8 @@ label {
 
 /* ===== Images ===== */
 .table img.item-image {
-  width: 56px;
-  height: 56px;
+  width: 200px;
+  height: 200px;
   border-radius: 10px;
   object-fit: cover;
   background-color: #fff;
