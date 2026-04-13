@@ -25,6 +25,7 @@
 		"@popperjs/core": "^2.11.8",
 		"axios": "^1.13.3",
 		"bootstrap": "5.3.8",
+		"crypto-js": "^4.2.0",
 		"d3-dsv": "^3.0.1",
 		"dayjs": "^1.11.19",
 		"fabric": "^6.7.1",

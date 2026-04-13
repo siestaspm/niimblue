@@ -4,7 +4,7 @@
   import { onMount, onDestroy, tick } from "svelte";
   import { QRCode } from "$/fabric-object/qrcode";
   import { ImageEncoder, AbstractPrintTask, Utils, type EncodedImage } from "@mmote/niimbluelib";
-
+import CryptoJS from "crypto-js";
   import { iconCodepoints, type MaterialIcon } from "$/styles/mdi_icons";
   import { automation, connectionState, csvData } from "$/stores";
   import {
@@ -26,6 +26,8 @@
   import { DEFAULT_LABEL_PROPS, GRID_SIZE } from "$/defaults";
   import { LabelDesignerUtils } from "$/utils/label_designer_utils";
   import { CustomCanvas } from "$/fabric-object/custom_canvas";
+  const XURE_AUCTION_ITEM_LINK = "https://auction.xure.app.xuredeal.com";
+  const ENCRYPTION_PASSCODE = "@D4t4dyn4m1xIT";
 
   // ---------------------------
   // Props
@@ -87,8 +89,17 @@
     if (!firstItem) return;
 
     // QR
+    const encrypted = CryptoJS.AES
+    .encrypt(firstItem.listing_id.toString(), ENCRYPTION_PASSCODE)
+    .toString();
+
+  const urlSafe = encrypted
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
     const qr = new QRCode({
-      text: `https://links.xuredeal.com/open-app/xchange_item/${firstItem.listing_id}`,
+      text: `${XURE_AUCTION_ITEM_LINK}/xchange_item/${urlSafe}`,
       width: 190,
       height: 190,
       left: 20,
@@ -140,11 +151,23 @@
     let topOffset = 25;
     const spacing = 220;
 
+    
+
     items.forEach((item, index) => {
       const yPosition = topOffset + index * spacing;
 
+      const encrypted = CryptoJS.AES
+    .encrypt(item.listing_id.toString(), ENCRYPTION_PASSCODE)
+    .toString();
+
+  const urlSafe = encrypted
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+
       fabricCanvas.add(new QRCode({
-        text: `https://links.xuredeal.com/open-app/xchange_item/${item.listing_id}`,
+        text: `${XURE_AUCTION_ITEM_LINK}/xchange_item/${urlSafe}`,
         width: 190,
         height: 190,
         left: 20,
@@ -309,9 +332,18 @@
     // Generate canvas for current item only
     fabricCanvas!.clear();
     const item = itemsToPrint[currentPrintIndex];
+
+    const encrypted = CryptoJS.AES
+    .encrypt(item.listing_id.toString(), ENCRYPTION_PASSCODE)
+    .toString();
+
+  const urlSafe = encrypted
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
     
     fabricCanvas!.add(new QRCode({
-      text: `https://links.xuredeal.com/open-app/xchange_item/${item.listing_id}`,
+      text: `${XURE_AUCTION_ITEM_LINK}/xchange_item/${urlSafe}`,
       width: 190,
       height: 190,
       left: 20,
